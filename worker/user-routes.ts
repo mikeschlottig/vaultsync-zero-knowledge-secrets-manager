@@ -20,14 +20,12 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
     if (!fullToken.startsWith('vs_live_')) {
       return bad(c, 'Invalid token format');
     }
-    // Prefix is vs_live_ + first 3 chars of entropy (total 11)
     const prefix = fullToken.slice(0, 11);
-    const tokenKeyRaw = fullToken.slice(11); // The secret part
+    const tokenKeyRaw = fullToken.slice(11);
     const token = await TokenEntity.findByPrefix(c.env, prefix);
     if (!token) {
       return notFound(c, 'Token not found or revoked');
     }
-    // Secure Hash Validation
     const providedHash = await hashToken(tokenKeyRaw);
     if (providedHash !== token.tokenHash) {
       return c.json({ success: false, error: 'Unauthorized: Invalid token key' }, 401);
@@ -35,15 +33,27 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
     if (token.expiresAt && Date.now() > token.expiresAt) {
       return bad(c, 'Token expired');
     }
-    const secrets = await SecretEntity.listByProject(c.env, token.projectId);
-    const envFilter = c.req.query('env');
-    const filteredSecrets = envFilter
-      ? secrets.filter(s => s.environment === envFilter)
-      : secrets;
+    let secrets = await SecretEntity.listByProject(c.env, token.projectId);
+    // Path-based filtering: ?path=prod/DATABASE_URL or ?path=/dev/API_KEY
+    const pathParam = c.req.query('path');
+    if (pathParam) {
+      const cleanPath = pathParam.startsWith('/') ? pathParam.slice(1) : pathParam;
+      const parts = cleanPath.split('/');
+      if (parts.length === 2) {
+        const [env, key] = parts;
+        secrets = secrets.filter(s => s.environment === env && s.key === key);
+      }
+    } else {
+      // Legacy or complementary environment filter
+      const envFilter = c.req.query('env');
+      if (envFilter) {
+        secrets = secrets.filter(s => s.environment === envFilter);
+      }
+    }
     return ok(c, {
       projectId: token.projectId,
       encryptedProjectKey: token.encryptedProjectKey,
-      secrets: filteredSecrets.map(s => ({
+      secrets: secrets.map(s => ({
         key: s.key,
         environment: s.environment,
         encryptedValue: s.encryptedValue
