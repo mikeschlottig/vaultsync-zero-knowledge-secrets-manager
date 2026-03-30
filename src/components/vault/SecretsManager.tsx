@@ -5,14 +5,18 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Search, Eye, EyeOff, Copy, Plus, Filter } from 'lucide-react';
+import { Search, Eye, EyeOff, Copy, Plus, Trash2, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { CreateSecretModal } from './CreateSecretModal';
 export function SecretsManager() {
   const secrets = useVaultStore(s => s.secrets);
   const masterKey = useVaultStore(s => s.masterKey);
+  const removeSecret = useVaultStore(s => s.removeSecret);
+  const isLoading = useVaultStore(s => s.isLoading);
   const [search, setSearch] = useState('');
   const [revealed, setRevealed] = useState<Record<string, string>>({});
   const [filterEnv, setFilterEnv] = useState<'all' | 'dev' | 'staging' | 'prod'>('all');
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const filteredSecrets = useMemo(() => {
     return secrets.filter(s => {
       const matchesSearch = s.key.toLowerCase().includes(search.toLowerCase());
@@ -44,17 +48,18 @@ export function SecretsManager() {
     try {
       const val = revealed[secretId] || await decryptValue(masterKey, secret.encryptedValue.ciphertext, secret.encryptedValue.iv);
       await navigator.clipboard.writeText(val);
-      toast.success("Copied to clipboard", { description: "Clipboard will clear in 30s" });
-      // Auto-clear logic
-      setTimeout(async () => {
-        const current = await navigator.clipboard.readText();
-        if (current === val) {
-          await navigator.clipboard.writeText("");
-          toast.info("Clipboard cleared for security");
-        }
-      }, 30000);
+      toast.success("Copied to clipboard");
     } catch (err) {
       toast.error("Failed to copy");
+    }
+  };
+  const handleDelete = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this secret?")) return;
+    try {
+      await removeSecret(id);
+      toast.success("Secret deleted");
+    } catch (e) {
+      toast.error("Delete failed");
     }
   };
   return (
@@ -64,15 +69,15 @@ export function SecretsManager() {
           <h1 className="text-3xl font-bold text-white tracking-tight">Secrets</h1>
           <p className="text-zinc-400">Securely store and manage environment variables.</p>
         </div>
-        <Button className="bg-emerald-600 hover:bg-emerald-500 text-white gap-2">
+        <Button onClick={() => setIsModalOpen(true)} className="bg-emerald-600 hover:bg-emerald-500 text-white gap-2">
           <Plus className="w-4 h-4" /> New Secret
         </Button>
       </div>
       <div className="flex flex-col sm:flex-row gap-4">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
-          <Input 
-            placeholder="Search secrets..." 
+          <Input
+            placeholder="Search secrets..."
             className="pl-10 bg-zinc-900 border-zinc-800 text-white focus:ring-emerald-500/50"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -103,7 +108,13 @@ export function SecretsManager() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredSecrets.length === 0 ? (
+            {isLoading ? (
+              <TableRow>
+                <TableCell colSpan={4} className="h-32 text-center">
+                  <Loader2 className="w-6 h-6 animate-spin mx-auto text-emerald-500" />
+                </TableCell>
+              </TableRow>
+            ) : filteredSecrets.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={4} className="h-32 text-center text-zinc-500">
                   No secrets found
@@ -121,22 +132,30 @@ export function SecretsManager() {
                   <TableCell className="font-mono text-zinc-400">
                     {revealed[secret.id] ? revealed[secret.id] : '••••••••••••••••'}
                   </TableCell>
-                  <TableCell className="text-right space-x-2">
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="text-zinc-400 hover:text-white"
+                  <TableCell className="text-right space-x-1">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="text-zinc-400 hover:text-white h-8 w-8"
                       onClick={() => handleReveal(secret.id)}
                     >
                       {revealed[secret.id] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </Button>
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="text-zinc-400 hover:text-white"
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="text-zinc-400 hover:text-white h-8 w-8"
                       onClick={() => handleCopy(secret.id)}
                     >
                       <Copy className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="text-zinc-400 hover:text-red-400 h-8 w-8"
+                      onClick={() => handleDelete(secret.id)}
+                    >
+                      <Trash2 className="w-4 h-4" />
                     </Button>
                   </TableCell>
                 </TableRow>
@@ -145,6 +164,7 @@ export function SecretsManager() {
           </TableBody>
         </Table>
       </div>
+      <CreateSecretModal open={isModalOpen} onOpenChange={setIsModalOpen} />
     </div>
   );
 }

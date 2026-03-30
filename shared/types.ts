@@ -26,8 +26,16 @@ export interface ServiceToken {
   projectId: string;
   name: string;
   tokenPrefix: string; // First 8 chars for identification
+  encryptedProjectKey: EncryptedPayload; // Project Key encrypted by the Token Key
   createdAt: number;
   expiresAt?: number;
+}
+export interface InjectionRequest {
+  projectId: string;
+  tokenKey: string; // The high-entropy part of the service token
+}
+export interface InjectionResponse {
+  secrets: Record<string, string>;
 }
 export interface User {
   id: string;

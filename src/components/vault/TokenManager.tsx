@@ -1,23 +1,60 @@
 import React, { useState } from 'react';
 import { useVaultStore } from '@/store/vault';
+import { encryptValue } from '@/lib/crypto';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
-import { Key, Copy, Plus, ShieldAlert, Check } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Copy, Plus, ShieldAlert, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 export function TokenManager() {
   const tokens = useVaultStore(s => s.tokens);
+  const projects = useVaultStore(s => s.projects);
+  const createToken = useVaultStore(s => s.createToken);
+  const revokeToken = useVaultStore(s => s.revokeToken);
   const [isGenerating, setIsGenerating] = useState(false);
   const [newTokenName, setNewTokenName] = useState('');
+  const [selectedProjectId, setSelectedProjectId] = useState('');
   const [generatedToken, setGeneratedToken] = useState<string | null>(null);
-  const handleGenerate = () => {
-    if (!newTokenName) return;
-    const mockToken = `vs_live_${crypto.randomUUID().replace(/-/g, '')}`;
-    setGeneratedToken(mockToken);
-    toast.success("Token generated successfully");
+  const handleGenerate = async () => {
+    if (!newTokenName || !selectedProjectId) return;
+    try {
+      const tokenKey = crypto.randomUUID().replace(/-/g, '');
+      const fullToken = `vs_live_${tokenKey}`;
+      // Zero-Knowledge Injection logic:
+      // We derive a temporary key from the tokenKey to encrypt the Project Key
+      const projectKey = "placeholder-project-key"; // In real app, this would be a per-project AES key
+      const encoder = new TextEncoder();
+      const cryptoTokenKey = await window.crypto.subtle.importKey(
+        'raw', 
+        encoder.encode(tokenKey), 
+        'AES-GCM', 
+        false, 
+        ['encrypt']
+      );
+      const encryptedProjectKey = await encryptValue(cryptoTokenKey, projectKey);
+      await createToken({
+        projectId: selectedProjectId,
+        name: newTokenName,
+        tokenPrefix: fullToken.slice(0, 11),
+        encryptedProjectKey,
+      });
+      setGeneratedToken(fullToken);
+      toast.success("Token created successfully");
+    } catch (e) {
+      toast.error("Failed to generate token");
+    }
+  };
+  const handleRevoke = async (id: string) => {
+    if (!confirm("Are you sure you want to revoke this token?")) return;
+    try {
+      await revokeToken(id);
+      toast.success("Token revoked");
+    } catch (e) {
+      toast.error("Revocation failed");
+    }
   };
   return (
     <div className="space-y-6">
@@ -28,7 +65,7 @@ export function TokenManager() {
         </div>
         <Dialog open={isGenerating} onOpenChange={(open) => {
           setIsGenerating(open);
-          if (!open) { setGeneratedToken(null); setNewTokenName(''); }
+          if (!open) { setGeneratedToken(null); setNewTokenName(''); setSelectedProjectId(''); }
         }}>
           <DialogTrigger asChild>
             <Button className="bg-emerald-600 hover:bg-emerald-500 text-white gap-2">
@@ -42,14 +79,26 @@ export function TokenManager() {
             {!generatedToken ? (
               <div className="space-y-4 py-4">
                 <div className="space-y-2">
-                  <Label htmlFor="name" className="text-zinc-400">Token Name</Label>
-                  <Input 
-                    id="name" 
-                    placeholder="e.g. GitHub Actions CI" 
+                  <Label className="text-zinc-400">Token Name</Label>
+                  <Input
+                    placeholder="e.g. GitHub Actions CI"
                     className="bg-zinc-950 border-zinc-800 focus:ring-emerald-500"
                     value={newTokenName}
                     onChange={(e) => setNewTokenName(e.target.value)}
                   />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-zinc-400">Project Access</Label>
+                  <Select onValueChange={setSelectedProjectId} value={selectedProjectId}>
+                    <SelectTrigger className="bg-zinc-950 border-zinc-800">
+                      <SelectValue placeholder="Select Project" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-zinc-900 border-zinc-800">
+                      {projects.map(p => (
+                        <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <Button className="w-full bg-emerald-600 hover:bg-emerald-500" onClick={handleGenerate}>
                   Generate
@@ -64,14 +113,14 @@ export function TokenManager() {
                   </p>
                 </div>
                 <div className="relative group">
-                  <Input 
-                    readOnly 
-                    value={generatedToken} 
-                    className="bg-zinc-950 border-zinc-800 pr-12 font-mono text-sm text-emerald-500" 
+                  <Input
+                    readOnly
+                    value={generatedToken}
+                    className="bg-zinc-950 border-zinc-800 pr-12 font-mono text-sm text-emerald-500"
                   />
-                  <Button 
-                    size="icon" 
-                    variant="ghost" 
+                  <Button
+                    size="icon"
+                    variant="ghost"
                     className="absolute right-1 top-1 text-zinc-500 hover:text-white"
                     onClick={() => {
                       navigator.clipboard.writeText(generatedToken);
@@ -113,7 +162,14 @@ export function TokenManager() {
                   <TableCell><code className="bg-zinc-800 px-2 py-1 rounded text-zinc-400 text-xs">{token.tokenPrefix}***</code></TableCell>
                   <TableCell className="text-zinc-500 text-sm">{new Date(token.createdAt).toLocaleDateString()}</TableCell>
                   <TableCell className="text-right">
-                    <Button variant="ghost" size="sm" className="text-zinc-500 hover:text-red-400">Revoke</Button>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="text-zinc-500 hover:text-red-400"
+                      onClick={() => handleRevoke(token.id)}
+                    >
+                      Revoke
+                    </Button>
                   </TableCell>
                 </TableRow>
               ))
