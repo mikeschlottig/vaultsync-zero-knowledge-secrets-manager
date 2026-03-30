@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useVaultStore } from '@/store/vault';
 import { encryptValue } from '@/lib/crypto';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -59,6 +59,7 @@ export function CreateSecretModal({ open, onOpenChange }: Props) {
       <DialogContent className="bg-zinc-900 border-zinc-800 text-white">
         <DialogHeader>
           <DialogTitle>Add New Secret</DialogTitle>
+          <DialogDescription className='text-sm text-zinc-500 -mt-2'>Add a new secret to securely store environment variables.</DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4 py-4">
           <div className="space-y-2">
@@ -68,9 +69,13 @@ export function CreateSecretModal({ open, onOpenChange }: Props) {
                 <SelectValue placeholder="Select Project" />
               </SelectTrigger>
               <SelectContent className="bg-zinc-900 border-zinc-800">
-                {projects.map(p => (
-                  <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
-                ))}
+                {projects.length === 0 ? (
+                  <SelectItem value="" disabled>No projects available</SelectItem>
+                ) : (
+                  projects.map(p => (
+                    <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                  ))
+                )}
               </SelectContent>
             </Select>
           </div>

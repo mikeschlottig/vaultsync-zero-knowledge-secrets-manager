@@ -28,7 +28,7 @@ export function SecretsManager() {
     if (activeProjectId) {
       fetchData();
     }
-  }, [activeProjectId]);
+  }, [activeProjectId, fetchData]);
   const filteredSecrets = useMemo(() => {
     return secrets.filter(s => {
       const matchesSearch = s.key.toLowerCase().includes(search.toLowerCase());

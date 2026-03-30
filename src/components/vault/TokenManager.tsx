@@ -3,7 +3,7 @@ import { useVaultStore } from '@/store/vault';
 import { encryptValue } from '@/lib/crypto';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -82,6 +82,7 @@ export function TokenManager() {
           <DialogContent className="bg-zinc-900 border-zinc-800 text-white sm:max-w-md">
             <DialogHeader>
               <DialogTitle>Generate Service Token</DialogTitle>
+              <DialogDescription className='text-sm text-zinc-500 -mt-2'>Generate a secure token for programmatic API access to secrets.</DialogDescription>
             </DialogHeader>
             {!generatedToken ? (
               <div className="space-y-4 py-4">
@@ -101,9 +102,13 @@ export function TokenManager() {
                       <SelectValue placeholder="Select Project" />
                     </SelectTrigger>
                     <SelectContent className="bg-zinc-900 border-zinc-800">
-                      {projects.map(p => (
+                    {projects.length === 0 ? (
+                      <SelectItem value='' disabled>No projects</SelectItem>
+                    ) : (
+                      projects.map(p => (
                         <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
-                      ))}
+                      ))
+                    )}
                     </SelectContent>
                   </Select>
                 </div>
