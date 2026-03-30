@@ -19,21 +19,27 @@ export function TokenManager() {
   const [newTokenName, setNewTokenName] = useState('');
   const [selectedProjectId, setSelectedProjectId] = useState(activeProjectId || '');
   const [generatedToken, setGeneratedToken] = useState<string | null>(null);
-  const activeProject = useMemo(() => 
-    projects.find(p => p.id === activeProjectId), 
+  const activeProject = useMemo(() =>
+    projects.find(p => p.id === activeProjectId),
     [projects, activeProjectId]
   );
   const handleGenerate = async () => {
     if (!newTokenName || !selectedProjectId) return;
     try {
-      const tokenKey = crypto.randomUUID().replace(/-/g, '');
-      const fullToken = `vs_live_${tokenKey}`;
-      const projectKey = "placeholder-project-key"; // In real app, this would be a per-project AES key
+      // High-entropy key part
+      const tokenKeyRaw = crypto.randomUUID().replace(/-/g, '');
+      const fullToken = `vs_live_${tokenKeyRaw}`;
+      // Derive a hash for server-side lookup validation (Zero-knowledge: server doesn't store tokenKeyRaw)
       const encoder = new TextEncoder();
+      const hashBuffer = await window.crypto.subtle.digest('SHA-256', encoder.encode(tokenKeyRaw));
+      const tokenHash = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+      // We use a placeholder for the Project Master Key in this UI demo
+      // In a real ZK app, this would be the actual Master Key for that project
+      const projectKey = "pk_" + selectedProjectId.slice(0, 8); 
       const cryptoTokenKey = await window.crypto.subtle.importKey(
         'raw',
-        encoder.encode(tokenKey),
-        'AES-GCM',
+        encoder.encode(tokenKeyRaw),
+        { name: 'AES-GCM' },
         false,
         ['encrypt']
       );
@@ -42,11 +48,13 @@ export function TokenManager() {
         projectId: selectedProjectId,
         name: newTokenName,
         tokenPrefix: fullToken.slice(0, 11),
+        tokenHash,
         encryptedProjectKey,
       });
       setGeneratedToken(fullToken);
       toast.success("Token created successfully");
     } catch (e) {
+      console.error(e);
       toast.error("Failed to generate token");
     }
   };

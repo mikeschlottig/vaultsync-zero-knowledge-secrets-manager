@@ -1,28 +1,28 @@
 import React from 'react';
 import { useVaultStore } from '@/store/vault';
-import { 
-  SidebarProvider, 
-  Sidebar, 
-  SidebarContent, 
-  SidebarHeader, 
-  SidebarFooter, 
-  SidebarMenu, 
-  SidebarMenuItem, 
-  SidebarMenuButton 
+import {
+  SidebarProvider,
+  Sidebar,
+  SidebarContent,
+  SidebarHeader,
+  SidebarFooter,
+  SidebarMenu,
+  SidebarMenuItem,
+  SidebarMenuButton
 } from '@/components/ui/sidebar';
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
 } from '@/components/ui/select';
-import { Key, Shield, LogOut, Code, Box, ChevronDown } from 'lucide-react';
+import { Key, Shield, LogOut, Code, Box, BookOpen } from 'lucide-react';
 import { cn } from '@/lib/utils';
 interface DashboardLayoutProps {
   children: React.ReactNode;
-  activeTab: 'secrets' | 'tokens' | 'projects';
-  onTabChange: (tab: 'secrets' | 'tokens' | 'projects') => void;
+  activeTab: 'secrets' | 'tokens' | 'projects' | 'docs';
+  onTabChange: (tab: 'secrets' | 'tokens' | 'projects' | 'docs') => void;
 }
 export function DashboardLayout({ children, activeTab, onTabChange }: DashboardLayoutProps) {
   const lock = useVaultStore(s => s.lock);
@@ -98,6 +98,19 @@ export function DashboardLayout({ children, activeTab, onTabChange }: DashboardL
                 >
                   <Box className="w-4 h-4" />
                   <span>Projects</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  isActive={activeTab === 'docs'}
+                  onClick={() => onTabChange('docs')}
+                  className={cn(
+                    "w-full justify-start gap-3 h-10 px-3 rounded-md transition-colors",
+                    activeTab === 'docs' ? "bg-emerald-500/10 text-emerald-500" : "hover:bg-zinc-800 text-zinc-400"
+                  )}
+                >
+                  <BookOpen className="w-4 h-4" />
+                  <span>Integrations</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>

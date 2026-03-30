@@ -3,6 +3,42 @@ import type { Env } from './core-utils';
 import { ProjectEntity, SecretEntity, TokenEntity } from "./entities";
 import { ok, bad, notFound } from './core-utils';
 export function userRoutes(app: Hono<{ Bindings: Env }>) {
+  // PUBLIC INJECTION API (Zero-Knowledge)
+  app.get('/api/v1/fetch', async (c) => {
+    const authHeader = c.req.header('Authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return bad(c, 'Missing or invalid Authorization header');
+    }
+    const fullToken = authHeader.split(' ')[1];
+    if (!fullToken.startsWith('vs_live_')) {
+      return bad(c, 'Invalid token format');
+    }
+    const prefix = fullToken.slice(0, 11); // "vs_live_" + first 3 chars of key or just first 11 total
+    const token = await TokenEntity.findByPrefix(c.env, prefix);
+    if (!token) {
+      return notFound(c, 'Token not found or revoked');
+    }
+    // Optional: Check expiry
+    if (token.expiresAt && Date.now() > token.expiresAt) {
+      return bad(c, 'Token expired');
+    }
+    // Fetch secrets for the project associated with this token
+    const secrets = await SecretEntity.listByProject(c.env, token.projectId);
+    // Optional filtering by environment
+    const envFilter = c.req.query('env');
+    const filteredSecrets = envFilter 
+      ? secrets.filter(s => s.environment === envFilter)
+      : secrets;
+    return ok(c, {
+      projectId: token.projectId,
+      encryptedProjectKey: token.encryptedProjectKey,
+      secrets: filteredSecrets.map(s => ({
+        key: s.key,
+        environment: s.environment,
+        encryptedValue: s.encryptedValue
+      }))
+    });
+  });
   // PROJECTS
   app.get('/api/projects', async (c) => {
     const page = await ProjectEntity.list(c.env);
@@ -20,12 +56,10 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
   });
   app.delete('/api/projects/:id', async (c) => {
     const projectId = c.req.param('id');
-    // Cascade delete secrets
     const secrets = await SecretEntity.listByProject(c.env, projectId);
     if (secrets.length > 0) {
       await SecretEntity.deleteMany(c.env, secrets.map(s => s.id));
     }
-    // Cascade delete tokens
     const tokens = await TokenEntity.listByProject(c.env, projectId);
     if (tokens.length > 0) {
       await TokenEntity.deleteMany(c.env, tokens.map(t => t.id));

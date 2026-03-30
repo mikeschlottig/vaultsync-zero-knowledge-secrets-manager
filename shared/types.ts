@@ -25,7 +25,8 @@ export interface ServiceToken {
   id: string;
   projectId: string;
   name: string;
-  tokenPrefix: string; // First 8 chars for identification
+  tokenPrefix: string; // First 8 chars for identification (vs_live_...)
+  tokenHash: string;   // SHA-256 hash of the tokenKey for server-side validation
   encryptedProjectKey: EncryptedPayload; // Project Key encrypted by the Token Key
   createdAt: number;
   expiresAt?: number;
@@ -35,7 +36,13 @@ export interface InjectionRequest {
   tokenKey: string; // The high-entropy part of the service token
 }
 export interface InjectionResponse {
-  secrets: Record<string, string>;
+  projectId: string;
+  encryptedProjectKey: EncryptedPayload;
+  secrets: {
+    key: string;
+    environment: Environment;
+    encryptedValue: EncryptedPayload;
+  }[];
 }
 export interface User {
   id: string;

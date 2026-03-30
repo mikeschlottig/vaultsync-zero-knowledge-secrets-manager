@@ -4,11 +4,12 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { SecretsManager } from '@/components/vault/SecretsManager';
 import { TokenManager } from '@/components/vault/TokenManager';
 import { ProjectManager } from '@/components/vault/ProjectManager';
+import { DocsView } from '@/components/vault/DocsView';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Shield, Lock, ArrowRight, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Toaster, toast } from 'sonner';
+type Tab = 'secrets' | 'tokens' | 'projects' | 'docs';
 function UnlockScreen() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -78,7 +79,7 @@ function UnlockScreen() {
 }
 export function HomePage() {
   const isUnlocked = useVaultStore(s => s.isUnlocked);
-  const [activeTab, setActiveTab] = useState<'secrets' | 'tokens' | 'projects'>('secrets');
+  const [activeTab, setActiveTab] = useState<Tab>('secrets');
   if (!isUnlocked) return <UnlockScreen />;
   return (
     <DashboardLayout activeTab={activeTab} onTabChange={setActiveTab}>
@@ -113,6 +114,16 @@ export function HomePage() {
                 exit={{ opacity: 0, y: -10 }}
               >
                 <ProjectManager onSwitch={() => setActiveTab('secrets')} />
+              </motion.div>
+            )}
+            {activeTab === 'docs' && (
+              <motion.div
+                key="docs"
+                initial={{ opacity: 0, scale: 0.98 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 1.02 }}
+              >
+                <DocsView />
               </motion.div>
             )}
           </AnimatePresence>
