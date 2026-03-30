@@ -13,11 +13,19 @@ export interface Project {
   name: string;
   createdAt: number;
 }
+export interface SecretVersion {
+  id: string;
+  secretId: string;
+  encryptedValue: EncryptedPayload;
+  createdAt: number;
+  note?: string;
+}
 export interface Secret {
   id: string;
   projectId: string;
   key: string;
-  encryptedValue: EncryptedPayload;
+  encryptedValue: EncryptedPayload; // Denormalized latest value
+  currentVersionId: string;
   environment: Environment;
   updatedAt: number;
 }
@@ -25,15 +33,15 @@ export interface ServiceToken {
   id: string;
   projectId: string;
   name: string;
-  tokenPrefix: string; // First 8 chars for identification (vs_live_...)
-  tokenHash: string;   // SHA-256 hash of the tokenKey for server-side validation
-  encryptedProjectKey: EncryptedPayload; // Project Key encrypted by the Token Key
+  tokenPrefix: string;
+  tokenHash: string;
+  encryptedProjectKey: EncryptedPayload;
   createdAt: number;
   expiresAt?: number;
 }
 export interface InjectionRequest {
   projectId: string;
-  tokenKey: string; // The high-entropy part of the service token
+  tokenKey: string;
 }
 export interface InjectionResponse {
   projectId: string;

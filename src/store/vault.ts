@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Project, Secret, ServiceToken } from '@shared/types';
+import { Project, Secret, SecretVersion, ServiceToken } from '@shared/types';
 import { deriveKey } from '@/lib/crypto';
 import { api } from '@/lib/api-client';
 interface VaultState {
@@ -16,8 +16,10 @@ interface VaultState {
   fetchData: () => Promise<void>;
   addProject: (name: string) => Promise<void>;
   removeProject: (id: string) => Promise<void>;
-  addSecret: (secret: Omit<Secret, 'id' | 'updatedAt'>) => Promise<void>;
+  addSecret: (secret: Omit<Secret, 'id' | 'updatedAt' | 'currentVersionId'> & { note?: string }) => Promise<void>;
   removeSecret: (id: string) => Promise<void>;
+  fetchSecretVersions: (id: string) => Promise<SecretVersion[]>;
+  rollbackSecret: (secretId: string, versionId: string) => Promise<void>;
   createToken: (token: Omit<ServiceToken, 'id' | 'createdAt'>) => Promise<void>;
   revokeToken: (id: string) => Promise<void>;
 }
@@ -45,24 +47,14 @@ export const useVaultStore = create<VaultState>((set, get) => ({
       }
       const firstId = projects[0]?.id || null;
       set({ projects, activeProjectId: firstId });
-      if (firstId) {
-        await get().fetchData();
-      }
+      if (firstId) await get().fetchData();
     } finally {
       set({ isLoading: false });
     }
   },
-  lock: () => set({
-    isUnlocked: false,
-    masterKey: null,
-    secrets: [],
-    tokens: [],
-    projects: [],
-    activeProjectId: null
-  }),
+  lock: () => set({ isUnlocked: false, masterKey: null, secrets: [], tokens: [], projects: [], activeProjectId: null }),
   setActiveProjectId: (id) => {
-    const current = get().activeProjectId;
-    if (current === id) return;
+    if (get().activeProjectId === id) return;
     set({ activeProjectId: id });
     get().fetchData();
   },
@@ -76,55 +68,54 @@ export const useVaultStore = create<VaultState>((set, get) => ({
         api<ServiceToken[]>(`/api/tokens?projectId=${activeId}`)
       ]);
       set({ secrets, tokens });
-    } catch (e) {
-      console.error("Failed to fetch vault data", e);
     } finally {
       set({ isLoading: false });
     }
   },
   addProject: async (name: string) => {
-    const newProject = await api<Project>('/api/projects', {
-      method: 'POST',
-      body: JSON.stringify({ name })
-    });
-    set(state => ({
-      projects: [...state.projects, newProject]
-    }));
-    if (!get().activeProjectId) {
-      get().setActiveProjectId(newProject.id);
-    }
+    const newProject = await api<Project>('/api/projects', { method: 'POST', body: JSON.stringify({ name }) });
+    set(state => ({ projects: [...state.projects, newProject] }));
+    if (!get().activeProjectId) get().setActiveProjectId(newProject.id);
   },
   removeProject: async (id: string) => {
     await api(`/api/projects/${id}`, { method: 'DELETE' });
     const currentActive = get().activeProjectId;
     const remaining = get().projects.filter(p => p.id !== id);
-    let nextActive = currentActive;
-    if (currentActive === id) {
-      nextActive = remaining.length > 0 ? remaining[0].id : null;
-    }
+    let nextActive = currentActive === id ? (remaining[0]?.id || null) : currentActive;
     set({ projects: remaining, activeProjectId: nextActive });
-    if (nextActive && nextActive !== currentActive) {
-      await get().fetchData();
-    } else if (!nextActive) {
-      set({ secrets: [], tokens: [] });
-    }
+    if (nextActive) await get().fetchData();
+    else set({ secrets: [], tokens: [] });
   },
   addSecret: async (secretData) => {
-    const newSecret = await api<Secret>('/api/secrets', {
-      method: 'POST',
-      body: JSON.stringify(secretData)
+    const updatedSecret = await api<Secret>('/api/secrets', { method: 'POST', body: JSON.stringify(secretData) });
+    set(state => {
+      const idx = state.secrets.findIndex(s => s.id === updatedSecret.id);
+      if (idx !== -1) {
+        const next = [...state.secrets];
+        next[idx] = updatedSecret;
+        return { secrets: next };
+      }
+      return { secrets: [updatedSecret, ...state.secrets] };
     });
-    set(state => ({ secrets: [newSecret, ...state.secrets] }));
   },
   removeSecret: async (id) => {
     await api(`/api/secrets/${id}`, { method: 'DELETE' });
     set(state => ({ secrets: state.secrets.filter(s => s.id !== id) }));
   },
-  createToken: async (tokenData) => {
-    const newToken = await api<ServiceToken>('/api/tokens', {
+  fetchSecretVersions: async (id: string) => {
+    return api<SecretVersion[]>(`/api/secrets/${id}/versions`);
+  },
+  rollbackSecret: async (secretId: string, versionId: string) => {
+    const updated = await api<Secret>(`/api/secrets/${secretId}/rollback`, {
       method: 'POST',
-      body: JSON.stringify(tokenData)
+      body: JSON.stringify({ versionId })
     });
+    set(state => ({
+      secrets: state.secrets.map(s => s.id === secretId ? updated : s)
+    }));
+  },
+  createToken: async (tokenData) => {
+    const newToken = await api<ServiceToken>('/api/tokens', { method: 'POST', body: JSON.stringify(tokenData) });
     set(state => ({ tokens: [newToken, ...state.tokens] }));
   },
   revokeToken: async (id) => {

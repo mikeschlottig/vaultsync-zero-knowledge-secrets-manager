@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useVaultStore } from '@/store/vault';
 import { encryptValue } from '@/lib/crypto';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { Loader2 } from 'lucide-react';
+import { Loader2, AlertCircle } from 'lucide-react';
 import { Environment } from '@shared/types';
 interface Props {
   open: boolean;
@@ -18,21 +18,26 @@ export function CreateSecretModal({ open, onOpenChange }: Props) {
   const addSecret = useVaultStore(s => s.addSecret);
   const projects = useVaultStore(s => s.projects);
   const activeProjectId = useVaultStore(s => s.activeProjectId);
+  const secrets = useVaultStore(s => s.secrets);
   const [loading, setLoading] = useState(false);
   const [key, setKey] = useState('');
   const [value, setValue] = useState('');
+  const [note, setNote] = useState('');
   const [env, setEnv] = useState<Environment>('dev');
   const [projectId, setProjectId] = useState(activeProjectId || '');
-  // Keep modal in sync with active project if it changes or when opening
   useEffect(() => {
     if (open && activeProjectId) {
       setProjectId(activeProjectId);
     }
   }, [open, activeProjectId]);
+  const existingSecret = useMemo(() => {
+    if (!key.trim()) return null;
+    return secrets.find(s => s.projectId === projectId && s.environment === env && s.key === key.trim());
+  }, [key, env, projectId, secrets]);
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!masterKey || !key || !value || !projectId) {
-        toast.error("Please fill in all fields");
+        toast.error("Please fill in all required fields");
         return;
     }
     setLoading(true);
@@ -40,26 +45,32 @@ export function CreateSecretModal({ open, onOpenChange }: Props) {
       const encryptedValue = await encryptValue(masterKey, value);
       await addSecret({
         projectId,
-        key,
+        key: key.trim(),
         encryptedValue,
-        environment: env
+        environment: env,
+        note: note.trim()
       });
-      toast.success("Secret created");
+      toast.success(existingSecret ? "Secret updated (new version created)" : "Secret created");
       onOpenChange(false);
       setKey('');
       setValue('');
+      setNote('');
     } catch (err) {
-      toast.error("Encryption or save failed");
+      toast.error("Failed to save secret");
     } finally {
       setLoading(false);
     }
   };
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-zinc-900 border-zinc-800 text-white">
+      <DialogContent className="bg-zinc-900 border-zinc-800 text-white sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Add New Secret</DialogTitle>
-          <DialogDescription className='text-sm text-zinc-500 -mt-2'>Add a new secret to securely store environment variables.</DialogDescription>
+          <DialogTitle>{existingSecret ? "Update Secret" : "Add New Secret"}</DialogTitle>
+          <DialogDescription className='text-sm text-zinc-500 -mt-2'>
+            {existingSecret 
+              ? "This key already exists. Saving will create a new historical version." 
+              : "Add a new secret to securely store environment variables."}
+          </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4 py-4">
           <div className="space-y-2">
@@ -69,24 +80,33 @@ export function CreateSecretModal({ open, onOpenChange }: Props) {
                 <SelectValue placeholder="Select Project" />
               </SelectTrigger>
               <SelectContent className="bg-zinc-900 border-zinc-800">
-                {projects.length === 0 ? (
-                  <SelectItem value="" disabled>No projects available</SelectItem>
-                ) : (
-                  projects.map(p => (
-                    <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
-                  ))
-                )}
+                {projects.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-2">
-            <Label className="text-zinc-400">Secret Key</Label>
-            <Input
-              value={key}
-              onChange={e => setKey(e.target.value)}
-              placeholder="e.g. STRIPE_API_KEY"
-              className="bg-zinc-950 border-zinc-800 font-mono"
-            />
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label className="text-zinc-400">Environment</Label>
+              <Select onValueChange={(v) => setEnv(v as Environment)} value={env}>
+                <SelectTrigger className="bg-zinc-950 border-zinc-800">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-zinc-900 border-zinc-800">
+                  <SelectItem value="dev">Development</SelectItem>
+                  <SelectItem value="staging">Staging</SelectItem>
+                  <SelectItem value="prod">Production</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label className="text-zinc-400">Secret Key</Label>
+              <Input
+                value={key}
+                onChange={e => setKey(e.target.value)}
+                placeholder="DATABASE_URL"
+                className="bg-zinc-950 border-zinc-800 font-mono"
+              />
+            </div>
           </div>
           <div className="space-y-2">
             <Label className="text-zinc-400">Secret Value</Label>
@@ -99,21 +119,23 @@ export function CreateSecretModal({ open, onOpenChange }: Props) {
             />
           </div>
           <div className="space-y-2">
-            <Label className="text-zinc-400">Environment</Label>
-            <Select onValueChange={(v) => setEnv(v as Environment)} value={env}>
-              <SelectTrigger className="bg-zinc-950 border-zinc-800">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent className="bg-zinc-900 border-zinc-800">
-                <SelectItem value="dev">Development</SelectItem>
-                <SelectItem value="staging">Staging</SelectItem>
-                <SelectItem value="prod">Production</SelectItem>
-              </SelectContent>
-            </Select>
+            <Label className="text-zinc-400">Version Note (Optional)</Label>
+            <Input
+              value={note}
+              onChange={e => setNote(e.target.value)}
+              placeholder="e.g. Rotation for Q3"
+              className="bg-zinc-950 border-zinc-800"
+            />
           </div>
+          {existingSecret && (
+            <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center gap-3 text-xs text-emerald-500">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              <span>You are updating an existing key. Previous values are kept in history.</span>
+            </div>
+          )}
           <DialogFooter>
-            <Button type="submit" disabled={loading} className="bg-emerald-600 hover:bg-emerald-500 w-full mt-2">
-              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Create Secret"}
+            <Button type="submit" disabled={loading} className={`${existingSecret ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-emerald-600'} w-full mt-2 text-white`}>
+              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : (existingSecret ? "Update & Save Version" : "Create Secret")}
             </Button>
           </DialogFooter>
         </form>
