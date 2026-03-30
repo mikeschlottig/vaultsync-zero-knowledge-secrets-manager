@@ -1,7 +1,7 @@
 # VaultSync
 
 [![Deploy to Cloudflare Workers](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=${repositoryUrl})  
-[cloudflarebutton]
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/mikeschlottig/vaultsync-zero-knowledge-secrets-manager)
 
 A modern full-stack starter template for Cloudflare Workers. Build scalable, real-time applications with React frontend, Hono backend, and Durable Objects for stateful data storage. Includes users, chat boards, and extensible entity system.
 
@@ -123,7 +123,7 @@ Responses: `{ success: true, data: ... }`
    ```
 
 3. **One-Click Deploy**:
-   [cloudflarebutton]
+   [![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/mikeschlottig/vaultsync-zero-knowledge-secrets-manager)
 
 **Notes**:
 - Configured for Cloudflare Pages + Workers (SPA fallback)
