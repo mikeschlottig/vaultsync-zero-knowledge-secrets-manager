@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useVaultStore } from '@/store/vault';
 import { decryptValue } from '@/lib/crypto';
 import { Secret, SecretVersion } from '@shared/types';
@@ -21,23 +21,24 @@ export function SecretHistoryModal({ secret, open, onOpenChange }: Props) {
   const [loading, setLoading] = useState(false);
   const [revealed, setRevealed] = useState<Record<string, string>>({});
   const [rollingBack, setRollingBack] = useState<string | null>(null);
-  useEffect(() => {
-    if (open && secret) {
-      loadVersions();
-    }
-  }, [open, secret]);
-  const loadVersions = async () => {
+  const loadVersions = useCallback(async () => {
     if (!secret) return;
     setLoading(true);
     try {
       const data = await fetchSecretVersions(secret.id);
       setVersions(data);
     } catch (e) {
+      console.error('History fetch error:', e);
       toast.error("Failed to load history");
     } finally {
       setLoading(false);
     }
-  };
+  }, [secret, fetchSecretVersions]);
+  useEffect(() => {
+    if (open && secret) {
+      loadVersions();
+    }
+  }, [open, secret, loadVersions]);
   const handleReveal = async (version: SecretVersion) => {
     if (revealed[version.id]) {
       const next = { ...revealed };
@@ -121,9 +122,9 @@ export function SecretHistoryModal({ secret, open, onOpenChange }: Props) {
                           <Copy className="w-4 h-4" />
                         </Button>
                         {idx !== 0 && (
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
+                          <Button
+                            variant="ghost"
+                            size="icon"
                             className="h-8 w-8 text-emerald-500 hover:bg-emerald-500/10"
                             onClick={() => handleRollback(version)}
                             disabled={rollingBack === version.id}

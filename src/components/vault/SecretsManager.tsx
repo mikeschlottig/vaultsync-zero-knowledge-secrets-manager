@@ -68,19 +68,25 @@ export function SecretsManager() {
           try {
             const currentContent = await navigator.clipboard.readText();
             shouldClear = currentContent === val;
-          } catch (e) { shouldClear = true; }
+          } catch (e) { 
+            // If read permissions denied, assume we should clear for safety
+            shouldClear = true; 
+            console.warn('Clipboard read denied during clear operation', e);
+          }
           if (shouldClear) {
             await navigator.clipboard.writeText('');
             if (isMounted.current) toast.info("Clipboard cleared");
           }
-        } catch (e) {}
+        } catch (e) {
+          console.error('Failed to auto-clear clipboard', e);
+        }
       }, 30000);
     } catch (err) {
       toast.error("Copy failed");
     }
   };
   const handleDelete = async (id: string) => {
-    if (!confirm("Delete this secret?")) return;
+    if (!confirm("Delete this secret? This will remove all historical versions.")) return;
     try {
       await removeSecret(id);
       toast.success("Secret deleted");
@@ -175,10 +181,10 @@ export function SecretsManager() {
         </Table>
       </div>
       <CreateSecretModal open={isCreateOpen} onOpenChange={setIsCreateOpen} />
-      <SecretHistoryModal 
-        secret={historySecret} 
-        open={!!historySecret} 
-        onOpenChange={(open) => !open && setHistorySecret(null)} 
+      <SecretHistoryModal
+        secret={historySecret}
+        open={!!historySecret}
+        onOpenChange={(open) => !open && setHistorySecret(null)}
       />
     </div>
   );

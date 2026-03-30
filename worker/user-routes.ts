@@ -68,6 +68,24 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
   });
   app.delete('/api/projects/:id', async (c) => {
     const projectId = c.req.param('id');
+    // CASCADE DELETION: Projects -> Secrets -> Versions + Projects -> Tokens
+    const secrets = await SecretEntity.listByProject(c.env, projectId);
+    const tokens = await TokenEntity.listByProject(c.env, projectId);
+    // Delete all secret versions first
+    for (const secret of secrets) {
+      const versions = await VersionEntity.listBySecret(c.env, secret.id);
+      if (versions.length > 0) {
+        await VersionEntity.deleteMany(c.env, versions.map(v => v.id));
+      }
+    }
+    // Delete all secrets
+    if (secrets.length > 0) {
+      await SecretEntity.deleteMany(c.env, secrets.map(s => s.id));
+    }
+    // Delete all tokens
+    if (tokens.length > 0) {
+      await TokenEntity.deleteMany(c.env, tokens.map(t => t.id));
+    }
     const deleted = await ProjectEntity.delete(c.env, projectId);
     return ok(c, { deleted });
   });
@@ -81,7 +99,6 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
   app.post('/api/secrets', async (c) => {
     const body = await c.req.json();
     const { projectId, key, environment, encryptedValue, note } = body;
-    // Find existing secret to handle versioning
     let existing = await SecretEntity.findExisting(c.env, projectId, environment, key);
     let secretId = existing ? existing.id : crypto.randomUUID();
     const versionId = crypto.randomUUID();
@@ -122,7 +139,6 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
     const vInst = new VersionEntity(c.env, versionId);
     const version = await vInst.getState();
     if (!version.id) return notFound(c, 'Version not found');
-    // Create a NEW version entry for the rollback event to maintain audit log
     const newVersionId = crypto.randomUUID();
     await VersionEntity.create(c.env, {
       id: newVersionId,
@@ -141,14 +157,20 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
     return ok(c, updated);
   });
   app.delete('/api/secrets/:id', async (c) => {
-    const deleted = await SecretEntity.delete(c.env, c.req.param('id'));
+    const secretId = c.req.param('id');
+    // CASCADE DELETION: Secret -> Versions
+    const versions = await VersionEntity.listBySecret(c.env, secretId);
+    if (versions.length > 0) {
+      await VersionEntity.deleteMany(c.env, versions.map(v => v.id));
+    }
+    const deleted = await SecretEntity.delete(c.env, secretId);
     return ok(c, { deleted });
   });
   // TOKENS
   app.get('/api/tokens', async (c) => {
     const projectId = c.req.query('projectId');
-    const tokens = projectId 
-      ? await TokenEntity.listByProject(c.env, projectId) 
+    const tokens = projectId
+      ? await TokenEntity.listByProject(c.env, projectId)
       : (await TokenEntity.list(c.env)).items;
     return ok(c, tokens);
   });

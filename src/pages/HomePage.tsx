@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useVaultStore } from '@/store/vault';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { SecretsManager } from '@/components/vault/SecretsManager';
@@ -96,6 +96,16 @@ function UnlockScreen() {
 export function HomePage() {
   const isUnlocked = useVaultStore(s => s.isUnlocked);
   const [activeTab, setActiveTab] = useState<Tab>('secrets');
+  useEffect(() => {
+    const handleNav = (e: Event) => {
+      const customEvent = e as CustomEvent<Tab>;
+      if (customEvent.detail) {
+        setActiveTab(customEvent.detail);
+      }
+    };
+    window.addEventListener('nav-tab', handleNav);
+    return () => window.removeEventListener('nav-tab', handleNav);
+  }, []);
   if (!isUnlocked) return (
     <>
       <UnlockScreen />
