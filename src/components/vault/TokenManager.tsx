@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useVaultStore } from '@/store/vault';
 import { encryptValue, exportKeyRaw } from '@/lib/crypto';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -20,7 +20,12 @@ export function TokenManager() {
   const [newTokenName, setNewTokenName] = useState('');
   const [selectedProjectId, setSelectedProjectId] = useState(activeProjectId || '');
   const [generatedToken, setGeneratedToken] = useState<string | null>(null);
-  const activeProject = useMemo(() => 
+  useEffect(() => {
+    if (activeProjectId && !selectedProjectId) {
+      setSelectedProjectId(activeProjectId);
+    }
+  }, [activeProjectId, selectedProjectId]);
+  const activeProject = useMemo(() =>
     projects.find(p => p.id === activeProjectId),
     [projects, activeProjectId]
   );
@@ -29,12 +34,16 @@ export function TokenManager() {
       toast.error("Please fill in all fields");
       return;
     }
+    const isValidProject = projects.some(p => p.id === selectedProjectId);
+    if (!isValidProject) {
+      toast.error("Invalid project selected");
+      return;
+    }
     if (!masterKey) {
       toast.error("Vault must be unlocked to generate tokens");
       return;
     }
     try {
-      // Entropy part (this is the actual key that stays client-side)
       const tokenKeyRaw = crypto.randomUUID().replace(/-/g, '');
       const fullToken = `vs_live_${tokenKeyRaw}`;
       const encoder = new TextEncoder();
@@ -43,7 +52,6 @@ export function TokenManager() {
         .map(b => b.toString(16).padStart(2, '0'))
         .join('');
       const rawMasterKey = await exportKeyRaw(masterKey);
-      // Use the raw entropy to create a crypto key for wrapping the project key
       const cryptoTokenKey = await window.crypto.subtle.importKey(
         'raw',
         encoder.encode(tokenKeyRaw),
@@ -51,12 +59,11 @@ export function TokenManager() {
         false,
         ['encrypt']
       );
-      // Encrypt the project's master key with the high-entropy token key
       const encryptedProjectKey = await encryptValue(cryptoTokenKey, rawMasterKey);
       await createToken({
         projectId: selectedProjectId,
         name: newTokenName,
-        tokenPrefix: fullToken.slice(0, 11), // vs_live_ + first 3 chars
+        tokenPrefix: fullToken.slice(0, 11),
         tokenHash,
         encryptedProjectKey,
       });
@@ -76,6 +83,9 @@ export function TokenManager() {
       toast.error("Revocation failed");
     }
   };
+  const navigateToDocs = () => {
+    window.dispatchEvent(new CustomEvent('nav-tab', { detail: 'docs' }));
+  };
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -89,7 +99,11 @@ export function TokenManager() {
         </div>
         <Dialog open={isGenerating} onOpenChange={(open) => {
           setIsGenerating(open);
-          if (!open) { setGeneratedToken(null); setNewTokenName(''); setSelectedProjectId(activeProjectId || ''); }
+          if (!open) { 
+            setGeneratedToken(null); 
+            setNewTokenName(''); 
+            setSelectedProjectId(activeProjectId || ''); 
+          }
         }}>
           <DialogTrigger asChild>
             <Button className="bg-emerald-600 hover:bg-emerald-500 text-white gap-2 shadow-lg shadow-emerald-900/20">
@@ -107,8 +121,8 @@ export function TokenManager() {
               <div className="space-y-4 py-4">
                 <div className="space-y-2">
                   <Label className="text-zinc-400">Token Name</Label>
-                  <Input 
-                    placeholder="e.g. GitHub Actions CI" 
+                  <Input
+                    placeholder="e.g. GitHub Actions CI"
                     className="bg-zinc-950 border-zinc-800 focus:ring-emerald-500"
                     value={newTokenName}
                     onChange={(e) => setNewTokenName(e.target.value)}
@@ -122,7 +136,7 @@ export function TokenManager() {
                     </SelectTrigger>
                     <SelectContent className="bg-zinc-900 border-zinc-800">
                     {projects.length === 0 ? (
-                      <SelectItem value='' disabled>No projects</SelectItem>
+                      <SelectItem value='none' disabled>No projects available</SelectItem>
                     ) : (
                       projects.map(p => (
                         <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
@@ -148,14 +162,14 @@ export function TokenManager() {
                   </p>
                 </div>
                 <div className="relative group">
-                  <Input 
-                    readOnly 
-                    value={generatedToken} 
+                  <Input
+                    readOnly
+                    value={generatedToken}
                     className="bg-zinc-950 border-zinc-800 pr-12 font-mono text-sm text-emerald-500"
                   />
-                  <Button 
-                    size="icon" 
-                    variant="ghost" 
+                  <Button
+                    size="icon"
+                    variant="ghost"
                     className="absolute right-1 top-1 text-zinc-500 hover:text-white"
                     onClick={() => {
                       navigator.clipboard.writeText(generatedToken);
@@ -194,7 +208,7 @@ export function TokenManager() {
                 <TableCell colSpan={4} className="h-32 text-center text-zinc-500">
                   <div className="flex flex-col items-center gap-2">
                     <span>No active service tokens in this project</span>
-                    <Button variant="link" className="text-emerald-500 text-xs gap-1" onClick={() => window.dispatchEvent(new CustomEvent('nav-tab', { detail: 'docs' }))}>
+                    <Button variant="link" className="text-emerald-500 text-xs gap-1" onClick={navigateToDocs}>
                       Learn how to use tokens <ExternalLink className="w-3 h-3" />
                     </Button>
                   </div>
@@ -207,9 +221,9 @@ export function TokenManager() {
                   <TableCell><code className="bg-zinc-800 px-2 py-1 rounded text-zinc-400 text-xs font-mono">{token.tokenPrefix}***</code></TableCell>
                   <TableCell className="text-zinc-500 text-sm">{new Date(token.createdAt).toLocaleDateString()}</TableCell>
                   <TableCell className="text-right">
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
+                    <Button
+                      variant="ghost"
+                      size="sm"
                       className="text-zinc-500 hover:text-red-400 transition-colors"
                       onClick={() => handleRevoke(token.id)}
                     >

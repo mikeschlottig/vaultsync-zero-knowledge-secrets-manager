@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useVaultStore } from '@/store/vault';
 import { decryptValue } from '@/lib/crypto';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -19,6 +19,12 @@ export function SecretsManager() {
   const [revealed, setRevealed] = useState<Record<string, string>>({});
   const [filterEnv, setFilterEnv] = useState<'all' | 'dev' | 'staging' | 'prod'>('all');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const isMounted = useRef(true);
+  useEffect(() => {
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
   const activeProject = useMemo(() =>
     projects.find(p => p.id === activeProjectId),
     [projects, activeProjectId]
@@ -55,19 +61,24 @@ export function SecretsManager() {
       const val = revealed[secretId] || await decryptValue(masterKey, secret.encryptedValue.ciphertext, secret.encryptedValue.iv);
       await navigator.clipboard.writeText(val);
       toast.success("Copied to clipboard (clearing in 30s)");
-      // Auto-clear clipboard after 30 seconds
       setTimeout(async () => {
         try {
-          // Attempt to check if the clipboard content is still the secret
-          // Note: In some browsers, readText requires explicit permission every time or may fail
-          const currentContent = await navigator.clipboard.readText().catch(() => null);
-          if (currentContent === null || currentContent === val) {
+          let shouldClear = true;
+          try {
+            const currentContent = await navigator.clipboard.readText();
+            shouldClear = currentContent === val;
+          } catch (e) {
+            // Permission denied or browser restriction - fallback to clear anyway for safety
+            shouldClear = true;
+          }
+          if (shouldClear) {
             await navigator.clipboard.writeText('');
-            toast.info("Clipboard cleared for security");
+            if (isMounted.current) {
+              toast.info("Clipboard cleared for security");
+            }
           }
         } catch (e) {
-          // Final fallback to clear without checking
-          navigator.clipboard.writeText('').catch(() => {});
+          // Final catch-all for background clearing
         }
       }, 30000);
     } catch (err) {

@@ -10,7 +10,6 @@ function Badge({ children, className }: { children: React.ReactNode, className?:
     </span>
   )
 }
-
 export function DocsView() {
   const origin = typeof window !== 'undefined' ? window.location.origin : 'https://vaultsync.io';
   const copyToClipboard = (text: string, label: string) => {
@@ -26,7 +25,7 @@ jobs:
       - uses: actions/checkout@v3
       - name: Inject VaultSync Secrets
         env:
-          VS_TOKEN: ${{ secrets.VAULTSYNC_TOKEN }}
+          VS_TOKEN: \${{ secrets.VAULTSYNC_TOKEN }}
         run: |
           # The token contains the decryption key for your project
           curl -s -H "Authorization: Bearer $VS_TOKEN" \\
@@ -81,7 +80,6 @@ async function vaultSyncFetch(token) {
             <h1 className="text-4xl font-extrabold text-white tracking-tight">Integrations Hub</h1>
             <p className="text-zinc-400 text-lg">Deploy secrets anywhere. Decryption happens only at the edge of your infrastructure.</p>
           </div>
-          {/* API Reference Card */}
           <section className="p-8 rounded-2xl bg-zinc-900 border border-zinc-800 shadow-2xl relative overflow-hidden">
             <div className="absolute top-0 right-0 p-4 opacity-10">
               <Globe className="w-24 h-24 text-emerald-500" />
@@ -111,7 +109,7 @@ async function vaultSyncFetch(token) {
                     <Box className="w-4 h-4 text-emerald-500" /> Path Filtering
                   </h4>
                   <p className="text-xs text-zinc-400 leading-relaxed">
-                    Request specific keys using the <code className="text-emerald-400">?path=env/key</code> parameter. 
+                    Request specific keys using the <code className="text-emerald-400">?path=env/key</code> parameter.
                     Reduces payload size and improves performance.
                   </p>
                 </div>
@@ -120,7 +118,7 @@ async function vaultSyncFetch(token) {
                     <Terminal className="w-4 h-4 text-emerald-500" /> Env Filtering
                   </h4>
                   <p className="text-xs text-zinc-400 leading-relaxed">
-                    Filter by environment using <code className="text-emerald-400">?env=prod</code>. 
+                    Filter by environment using <code className="text-emerald-400">?env=prod</code>.
                     Defaults to all project secrets if omitted.
                   </p>
                 </div>
@@ -225,7 +223,7 @@ async function vaultSyncFetch(token) {
             <div>
               <h4 className="text-emerald-500 font-bold mb-1">Production Ready</h4>
               <p className="text-zinc-400 text-sm leading-relaxed">
-                VaultSync's injection protocol is verified for SOC2 compliance. Data is encrypted using AES-GCM 256-bit and 
+                VaultSync's injection protocol is verified for SOC2 compliance. Data is encrypted using AES-GCM 256-bit and
                 decryption keys are never logged or stored on our servers.
               </p>
             </div>
