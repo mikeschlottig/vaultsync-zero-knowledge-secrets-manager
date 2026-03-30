@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useVaultStore } from '@/store/vault';
 import { encryptValue } from '@/lib/crypto';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -7,31 +7,34 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Copy, Plus, ShieldAlert, Trash2 } from 'lucide-react';
+import { Copy, Plus, ShieldAlert, Trash2, Box } from 'lucide-react';
 import { toast } from 'sonner';
 export function TokenManager() {
   const tokens = useVaultStore(s => s.tokens);
   const projects = useVaultStore(s => s.projects);
+  const activeProjectId = useVaultStore(s => s.activeProjectId);
   const createToken = useVaultStore(s => s.createToken);
   const revokeToken = useVaultStore(s => s.revokeToken);
   const [isGenerating, setIsGenerating] = useState(false);
   const [newTokenName, setNewTokenName] = useState('');
-  const [selectedProjectId, setSelectedProjectId] = useState('');
+  const [selectedProjectId, setSelectedProjectId] = useState(activeProjectId || '');
   const [generatedToken, setGeneratedToken] = useState<string | null>(null);
+  const activeProject = useMemo(() => 
+    projects.find(p => p.id === activeProjectId), 
+    [projects, activeProjectId]
+  );
   const handleGenerate = async () => {
     if (!newTokenName || !selectedProjectId) return;
     try {
       const tokenKey = crypto.randomUUID().replace(/-/g, '');
       const fullToken = `vs_live_${tokenKey}`;
-      // Zero-Knowledge Injection logic:
-      // We derive a temporary key from the tokenKey to encrypt the Project Key
       const projectKey = "placeholder-project-key"; // In real app, this would be a per-project AES key
       const encoder = new TextEncoder();
       const cryptoTokenKey = await window.crypto.subtle.importKey(
-        'raw', 
-        encoder.encode(tokenKey), 
-        'AES-GCM', 
-        false, 
+        'raw',
+        encoder.encode(tokenKey),
+        'AES-GCM',
+        false,
         ['encrypt']
       );
       const encryptedProjectKey = await encryptValue(cryptoTokenKey, projectKey);
@@ -60,12 +63,16 @@ export function TokenManager() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
+          <div className="flex items-center gap-2 text-zinc-500 mb-1">
+            <Box className="w-4 h-4" />
+            <span className="text-xs font-medium uppercase tracking-wider">{activeProject?.name || 'Loading project...'}</span>
+          </div>
           <h1 className="text-3xl font-bold text-white tracking-tight">Service Tokens</h1>
           <p className="text-zinc-400">Tokens for programmatically fetching secrets via API.</p>
         </div>
         <Dialog open={isGenerating} onOpenChange={(open) => {
           setIsGenerating(open);
-          if (!open) { setGeneratedToken(null); setNewTokenName(''); setSelectedProjectId(''); }
+          if (!open) { setGeneratedToken(null); setNewTokenName(''); setSelectedProjectId(activeProjectId || ''); }
         }}>
           <DialogTrigger asChild>
             <Button className="bg-emerald-600 hover:bg-emerald-500 text-white gap-2">
@@ -152,7 +159,7 @@ export function TokenManager() {
             {tokens.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={4} className="h-32 text-center text-zinc-500">
-                  No active service tokens
+                  No active service tokens in this project
                 </TableCell>
               </TableRow>
             ) : (
@@ -162,9 +169,9 @@ export function TokenManager() {
                   <TableCell><code className="bg-zinc-800 px-2 py-1 rounded text-zinc-400 text-xs">{token.tokenPrefix}***</code></TableCell>
                   <TableCell className="text-zinc-500 text-sm">{new Date(token.createdAt).toLocaleDateString()}</TableCell>
                   <TableCell className="text-right">
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
+                    <Button
+                      variant="ghost"
+                      size="sm"
                       className="text-zinc-500 hover:text-red-400"
                       onClick={() => handleRevoke(token.id)}
                     >

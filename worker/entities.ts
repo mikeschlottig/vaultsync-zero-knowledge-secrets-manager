@@ -32,6 +32,10 @@ export class TokenEntity extends IndexedEntity<ServiceToken> {
     encryptedProjectKey: { ciphertext: "", iv: "" },
     createdAt: 0
   };
+  static async listByProject(env: any, projectId: string): Promise<ServiceToken[]> {
+    const { items } = await this.list(env, null, 1000);
+    return items.filter(t => t.projectId === projectId);
+  }
   static async findByPrefix(env: any, prefix: string): Promise<ServiceToken | null> {
     const { items } = await this.list(env, null, 1000);
     return items.find(t => t.tokenPrefix === prefix) || null;

@@ -3,6 +3,7 @@ import { useVaultStore } from '@/store/vault';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { SecretsManager } from '@/components/vault/SecretsManager';
 import { TokenManager } from '@/components/vault/TokenManager';
+import { ProjectManager } from '@/components/vault/ProjectManager';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Shield, Lock, ArrowRight, Loader2 } from 'lucide-react';
@@ -27,9 +28,8 @@ function UnlockScreen() {
   };
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-zinc-950 p-6 relative overflow-hidden">
-      {/* Background Glow */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-emerald-500/10 rounded-full blur-[120px] pointer-events-none" />
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         className="w-full max-w-md"
@@ -48,17 +48,17 @@ function UnlockScreen() {
             <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none text-zinc-500 group-focus-within:text-emerald-500 transition-colors">
               <Lock className="w-4 h-4" />
             </div>
-            <Input
+            <input
               type="password"
               placeholder="Master Password"
-              className="pl-10 h-12 bg-zinc-900 border-zinc-800 text-white placeholder:text-zinc-600 focus:ring-emerald-500/50"
+              className="w-full h-12 pl-10 pr-4 bg-zinc-900 border border-zinc-800 rounded-lg text-white placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               disabled={loading}
             />
           </div>
-          <Button 
-            type="submit" 
+          <Button
+            type="submit"
             className="w-full h-12 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold transition-all active:scale-[0.98]"
             disabled={loading}
           >
@@ -78,14 +78,14 @@ function UnlockScreen() {
 }
 export function HomePage() {
   const isUnlocked = useVaultStore(s => s.isUnlocked);
-  const [activeTab, setActiveTab] = useState<'secrets' | 'tokens'>('secrets');
+  const [activeTab, setActiveTab] = useState<'secrets' | 'tokens' | 'projects'>('secrets');
   if (!isUnlocked) return <UnlockScreen />;
   return (
     <DashboardLayout activeTab={activeTab} onTabChange={setActiveTab}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="py-8 md:py-10 lg:py-12">
           <AnimatePresence mode="wait">
-            {activeTab === 'secrets' ? (
+            {activeTab === 'secrets' && (
               <motion.div
                 key="secrets"
                 initial={{ opacity: 0, x: -10 }}
@@ -94,7 +94,8 @@ export function HomePage() {
               >
                 <SecretsManager />
               </motion.div>
-            ) : (
+            )}
+            {activeTab === 'tokens' && (
               <motion.div
                 key="tokens"
                 initial={{ opacity: 0, x: 10 }}
@@ -102,6 +103,16 @@ export function HomePage() {
                 exit={{ opacity: 0, x: -10 }}
               >
                 <TokenManager />
+              </motion.div>
+            )}
+            {activeTab === 'projects' && (
+              <motion.div
+                key="projects"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+              >
+                <ProjectManager onSwitch={() => setActiveTab('secrets')} />
               </motion.div>
             )}
           </AnimatePresence>

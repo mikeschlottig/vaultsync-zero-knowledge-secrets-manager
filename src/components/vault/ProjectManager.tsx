@@ -3,7 +3,7 @@ import { useVaultStore } from '@/store/vault';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Plus, Box, Trash2, ArrowUpRight, Clock } from 'lucide-react';
 import { toast } from 'sonner';
@@ -30,10 +30,6 @@ export function ProjectManager({ onSwitch }: ProjectManagerProps) {
     }
   };
   const handleDelete = async (id: string) => {
-    if (projects.length <= 1) {
-      toast.error("Cannot delete the last remaining project");
-      return;
-    }
     try {
       await removeProject(id);
       toast.success("Project and all associated data deleted");
@@ -61,7 +57,6 @@ export function ProjectManager({ onSwitch }: ProjectManagerProps) {
           <DialogContent className="bg-zinc-900 border-zinc-800 text-white">
             <DialogHeader>
               <DialogTitle>Create New Project</DialogTitle>
-              <DialogDescription className='text-sm text-zinc-500 -mt-2'>Organize secrets into project workspaces.</DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
               <div className="space-y-2">

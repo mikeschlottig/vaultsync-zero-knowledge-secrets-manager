@@ -1,22 +1,34 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useVaultStore } from '@/store/vault';
 import { decryptValue } from '@/lib/crypto';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Search, Eye, EyeOff, Copy, Plus, Trash2, Loader2 } from 'lucide-react';
+import { Search, Eye, EyeOff, Copy, Plus, Trash2, Loader2, Box } from 'lucide-react';
 import { toast } from 'sonner';
 import { CreateSecretModal } from './CreateSecretModal';
 export function SecretsManager() {
   const secrets = useVaultStore(s => s.secrets);
+  const projects = useVaultStore(s => s.projects);
+  const activeProjectId = useVaultStore(s => s.activeProjectId);
   const masterKey = useVaultStore(s => s.masterKey);
   const removeSecret = useVaultStore(s => s.removeSecret);
   const isLoading = useVaultStore(s => s.isLoading);
+  const fetchData = useVaultStore(s => s.fetchData);
   const [search, setSearch] = useState('');
   const [revealed, setRevealed] = useState<Record<string, string>>({});
   const [filterEnv, setFilterEnv] = useState<'all' | 'dev' | 'staging' | 'prod'>('all');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const activeProject = useMemo(() => 
+    projects.find(p => p.id === activeProjectId), 
+    [projects, activeProjectId]
+  );
+  useEffect(() => {
+    if (activeProjectId) {
+      fetchData();
+    }
+  }, [activeProjectId]);
   const filteredSecrets = useMemo(() => {
     return secrets.filter(s => {
       const matchesSearch = s.key.toLowerCase().includes(search.toLowerCase());
@@ -66,6 +78,10 @@ export function SecretsManager() {
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
+          <div className="flex items-center gap-2 text-zinc-500 mb-1">
+            <Box className="w-4 h-4" />
+            <span className="text-xs font-medium uppercase tracking-wider">{activeProject?.name || 'Loading project...'}</span>
+          </div>
           <h1 className="text-3xl font-bold text-white tracking-tight">Secrets</h1>
           <p className="text-zinc-400">Securely store and manage environment variables.</p>
         </div>
@@ -117,7 +133,7 @@ export function SecretsManager() {
             ) : filteredSecrets.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={4} className="h-32 text-center text-zinc-500">
-                  No secrets found
+                  No secrets found in this project
                 </TableCell>
               </TableRow>
             ) : (
@@ -130,7 +146,11 @@ export function SecretsManager() {
                     </Badge>
                   </TableCell>
                   <TableCell className="font-mono text-zinc-400">
-                    {revealed[secret.id] ? revealed[secret.id] : '••••••••••••••••'}
+                    {revealed[secret.id] ? (
+                      <span className="text-zinc-100">{revealed[secret.id]}</span>
+                    ) : (
+                      '••••••••••••••••'
+                    )}
                   </TableCell>
                   <TableCell className="text-right space-x-1">
                     <Button
