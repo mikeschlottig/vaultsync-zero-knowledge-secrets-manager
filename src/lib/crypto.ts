@@ -24,9 +24,13 @@ export async function deriveKey(password: string, saltStr: string): Promise<Cryp
     },
     baseKey,
     { name: ALGO, length: 256 },
-    false,
+    true, // Set to true to allow exporting the key for service token wrapping
     ['encrypt', 'decrypt']
   );
+}
+export async function exportKeyRaw(key: CryptoKey): Promise<string> {
+  const exported = await window.crypto.subtle.exportKey('raw', key);
+  return btoa(String.fromCharCode(...new Uint8Array(exported)));
 }
 export async function encryptValue(key: CryptoKey, plaintext: string): Promise<{ ciphertext: string; iv: string }> {
   const iv = window.crypto.getRandomValues(new Uint8Array(12));

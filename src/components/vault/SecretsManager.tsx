@@ -58,18 +58,20 @@ export function SecretsManager() {
       // Auto-clear clipboard after 30 seconds
       setTimeout(async () => {
         try {
-          const currentContent = await navigator.clipboard.readText();
-          if (currentContent === val) {
+          // Attempt to check if the clipboard content is still the secret
+          // Note: In some browsers, readText requires explicit permission every time or may fail
+          const currentContent = await navigator.clipboard.readText().catch(() => null);
+          if (currentContent === null || currentContent === val) {
             await navigator.clipboard.writeText('');
             toast.info("Clipboard cleared for security");
           }
         } catch (e) {
-          // If permission denied or other error, fallback to just clearing
-          await navigator.clipboard.writeText('');
+          // Final fallback to clear without checking
+          navigator.clipboard.writeText('').catch(() => {});
         }
       }, 30000);
     } catch (err) {
-      toast.error("Failed to copy");
+      toast.error("Failed to copy to clipboard");
     }
   };
   const handleDelete = async (id: string) => {

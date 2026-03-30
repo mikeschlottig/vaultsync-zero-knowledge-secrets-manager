@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useVaultStore } from '@/store/vault';
-import { encryptValue } from '@/lib/crypto';
+import { encryptValue, exportKeyRaw } from '@/lib/crypto';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
@@ -13,6 +13,7 @@ export function TokenManager() {
   const tokens = useVaultStore(s => s.tokens);
   const projects = useVaultStore(s => s.projects);
   const activeProjectId = useVaultStore(s => s.activeProjectId);
+  const masterKey = useVaultStore(s => s.masterKey);
   const createToken = useVaultStore(s => s.createToken);
   const revokeToken = useVaultStore(s => s.revokeToken);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -24,18 +25,23 @@ export function TokenManager() {
     [projects, activeProjectId]
   );
   const handleGenerate = async () => {
-    if (!newTokenName || !selectedProjectId) return;
+    if (!newTokenName || !selectedProjectId) {
+      toast.error("Please fill in all fields");
+      return;
+    }
+    if (!masterKey) {
+      toast.error("Vault must be unlocked to generate tokens");
+      return;
+    }
     try {
-      // High-entropy key part
       const tokenKeyRaw = crypto.randomUUID().replace(/-/g, '');
       const fullToken = `vs_live_${tokenKeyRaw}`;
-      // Derive a hash for server-side lookup validation (Zero-knowledge: server doesn't store tokenKeyRaw)
       const encoder = new TextEncoder();
       const hashBuffer = await window.crypto.subtle.digest('SHA-256', encoder.encode(tokenKeyRaw));
-      const tokenHash = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
-      // We use a placeholder for the Project Master Key in this UI demo
-      // In a real ZK app, this would be the actual Master Key for that project
-      const projectKey = "pk_" + selectedProjectId.slice(0, 8); 
+      const tokenHash = Array.from(new Uint8Array(hashBuffer))
+        .map(b => b.toString(16).padStart(2, '0'))
+        .join('');
+      const rawMasterKey = await exportKeyRaw(masterKey);
       const cryptoTokenKey = await window.crypto.subtle.importKey(
         'raw',
         encoder.encode(tokenKeyRaw),
@@ -43,7 +49,7 @@ export function TokenManager() {
         false,
         ['encrypt']
       );
-      const encryptedProjectKey = await encryptValue(cryptoTokenKey, projectKey);
+      const encryptedProjectKey = await encryptValue(cryptoTokenKey, rawMasterKey);
       await createToken({
         projectId: selectedProjectId,
         name: newTokenName,
