@@ -29,16 +29,32 @@ function UnlockScreen() {
   };
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-zinc-950 p-6 relative overflow-hidden">
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-emerald-500/10 rounded-full blur-[120px] pointer-events-none" />
+      {/* Dynamic Background Glow */}
+      <motion.div 
+        animate={{ 
+          scale: [1, 1.1, 1],
+          opacity: [0.3, 0.4, 0.3]
+        }}
+        transition={{ 
+          duration: 8, 
+          repeat: Infinity,
+          ease: "easeInOut" 
+        }}
+        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-emerald-500/10 rounded-full blur-[120px] pointer-events-none" 
+      />
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-md"
+        className="w-full max-w-md relative z-10"
       >
         <div className="flex justify-center mb-8">
-          <div className="w-16 h-16 rounded-2xl bg-emerald-600 flex items-center justify-center shadow-[0_0_30px_-5px_rgba(16,185,129,0.5)]">
+          <motion.div 
+            whileHover={{ scale: 1.05 }}
+            whileActive={{ scale: 0.95 }}
+            className="w-16 h-16 rounded-2xl bg-emerald-600 flex items-center justify-center shadow-[0_0_30px_-5px_rgba(16,185,129,0.5)]"
+          >
             <Shield className="w-8 h-8 text-white" />
-          </div>
+          </motion.div>
         </div>
         <div className="text-center mb-8 space-y-2">
           <h1 className="text-3xl font-bold tracking-tight text-white">VaultSync</h1>
@@ -56,11 +72,12 @@ function UnlockScreen() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               disabled={loading}
+              autoFocus
             />
           </div>
           <Button
             type="submit"
-            className="w-full h-12 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold transition-all active:scale-[0.98]"
+            className="w-full h-12 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold transition-all active:scale-[0.98] shadow-lg shadow-emerald-900/20"
             disabled={loading}
           >
             {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : (
@@ -83,51 +100,53 @@ export function HomePage() {
   if (!isUnlocked) return <UnlockScreen />;
   return (
     <DashboardLayout activeTab={activeTab} onTabChange={setActiveTab}>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="py-8 md:py-10 lg:py-12">
-          <AnimatePresence mode="wait">
-            {activeTab === 'secrets' && (
-              <motion.div
-                key="secrets"
-                initial={{ opacity: 0, x: -10 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 10 }}
-              >
-                <SecretsManager />
-              </motion.div>
-            )}
-            {activeTab === 'tokens' && (
-              <motion.div
-                key="tokens"
-                initial={{ opacity: 0, x: 10 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -10 }}
-              >
-                <TokenManager />
-              </motion.div>
-            )}
-            {activeTab === 'projects' && (
-              <motion.div
-                key="projects"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-              >
-                <ProjectManager onSwitch={() => setActiveTab('secrets')} />
-              </motion.div>
-            )}
-            {activeTab === 'docs' && (
-              <motion.div
-                key="docs"
-                initial={{ opacity: 0, scale: 0.98 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 1.02 }}
-              >
-                <DocsView />
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
+      <div className="min-h-full bg-zinc-950/50 backdrop-blur-sm">
+        <AnimatePresence mode="wait">
+          {activeTab === 'secrets' && (
+            <motion.div
+              key="secrets"
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 10 }}
+              className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-10 lg:py-12"
+            >
+              <SecretsManager />
+            </motion.div>
+          )}
+          {activeTab === 'tokens' && (
+            <motion.div
+              key="tokens"
+              initial={{ opacity: 0, x: 10 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -10 }}
+              className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-10 lg:py-12"
+            >
+              <TokenManager />
+            </motion.div>
+          )}
+          {activeTab === 'projects' && (
+            <motion.div
+              key="projects"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-10 lg:py-12"
+            >
+              <ProjectManager onSwitch={() => setActiveTab('secrets')} />
+            </motion.div>
+          )}
+          {activeTab === 'docs' && (
+            <motion.div
+              key="docs"
+              initial={{ opacity: 0, scale: 0.98 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 1.02 }}
+              className="w-full"
+            >
+              <DocsView />
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
       <Toaster theme="dark" position="bottom-right" richColors />
     </DashboardLayout>
