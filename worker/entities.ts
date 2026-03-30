@@ -29,6 +29,7 @@ export class TokenEntity extends IndexedEntity<ServiceToken> {
     projectId: "",
     name: "",
     tokenPrefix: "",
+    tokenHash: "",
     encryptedProjectKey: { ciphertext: "", iv: "" },
     createdAt: 0
   };

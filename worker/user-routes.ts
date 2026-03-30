@@ -2,6 +2,13 @@ import { Hono } from "hono";
 import type { Env } from './core-utils';
 import { ProjectEntity, SecretEntity, TokenEntity } from "./entities";
 import { ok, bad, notFound } from './core-utils';
+async function hashToken(tokenKey: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(tokenKey);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
 export function userRoutes(app: Hono<{ Bindings: Env }>) {
   // PUBLIC INJECTION API (Zero-Knowledge)
   app.get('/api/v1/fetch', async (c) => {
@@ -13,20 +20,24 @@ export function userRoutes(app: Hono<{ Bindings: Env }>) {
     if (!fullToken.startsWith('vs_live_')) {
       return bad(c, 'Invalid token format');
     }
-    const prefix = fullToken.slice(0, 11); // "vs_live_" + first 3 chars of key or just first 11 total
+    // Prefix is vs_live_ + first 3 chars of entropy (total 11)
+    const prefix = fullToken.slice(0, 11);
+    const tokenKeyRaw = fullToken.slice(11); // The secret part
     const token = await TokenEntity.findByPrefix(c.env, prefix);
     if (!token) {
       return notFound(c, 'Token not found or revoked');
     }
-    // Optional: Check expiry
+    // Secure Hash Validation
+    const providedHash = await hashToken(tokenKeyRaw);
+    if (providedHash !== token.tokenHash) {
+      return c.json({ success: false, error: 'Unauthorized: Invalid token key' }, 401);
+    }
     if (token.expiresAt && Date.now() > token.expiresAt) {
       return bad(c, 'Token expired');
     }
-    // Fetch secrets for the project associated with this token
     const secrets = await SecretEntity.listByProject(c.env, token.projectId);
-    // Optional filtering by environment
     const envFilter = c.req.query('env');
-    const filteredSecrets = envFilter 
+    const filteredSecrets = envFilter
       ? secrets.filter(s => s.environment === envFilter)
       : secrets;
     return ok(c, {

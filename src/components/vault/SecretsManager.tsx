@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useVaultStore } from '@/store/vault';
 import { decryptValue } from '@/lib/crypto';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -15,20 +15,14 @@ export function SecretsManager() {
   const masterKey = useVaultStore(s => s.masterKey);
   const removeSecret = useVaultStore(s => s.removeSecret);
   const isLoading = useVaultStore(s => s.isLoading);
-  const fetchData = useVaultStore(s => s.fetchData);
   const [search, setSearch] = useState('');
   const [revealed, setRevealed] = useState<Record<string, string>>({});
   const [filterEnv, setFilterEnv] = useState<'all' | 'dev' | 'staging' | 'prod'>('all');
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const activeProject = useMemo(() => 
-    projects.find(p => p.id === activeProjectId), 
+  const activeProject = useMemo(() =>
+    projects.find(p => p.id === activeProjectId),
     [projects, activeProjectId]
   );
-  useEffect(() => {
-    if (activeProjectId) {
-      fetchData();
-    }
-  }, [activeProjectId, fetchData]);
   const filteredSecrets = useMemo(() => {
     return secrets.filter(s => {
       const matchesSearch = s.key.toLowerCase().includes(search.toLowerCase());
@@ -60,7 +54,20 @@ export function SecretsManager() {
     try {
       const val = revealed[secretId] || await decryptValue(masterKey, secret.encryptedValue.ciphertext, secret.encryptedValue.iv);
       await navigator.clipboard.writeText(val);
-      toast.success("Copied to clipboard");
+      toast.success("Copied to clipboard (clearing in 30s)");
+      // Auto-clear clipboard after 30 seconds
+      setTimeout(async () => {
+        try {
+          const currentContent = await navigator.clipboard.readText();
+          if (currentContent === val) {
+            await navigator.clipboard.writeText('');
+            toast.info("Clipboard cleared for security");
+          }
+        } catch (e) {
+          // If permission denied or other error, fallback to just clearing
+          await navigator.clipboard.writeText('');
+        }
+      }, 30000);
     } catch (err) {
       toast.error("Failed to copy");
     }

@@ -35,10 +35,8 @@ export const useVaultStore = create<VaultState>((set, get) => ({
       const salt = "vaultsync-v1-static-salt";
       const key = await deriveKey(password, salt);
       set({ masterKey: key, isUnlocked: true });
-      // Initial fetch to check projects
       let projects = await api<Project[]>('/api/projects');
       if (projects.length === 0) {
-        // Create Default Project for new users
         await api<Project>('/api/projects', {
           method: 'POST',
           body: JSON.stringify({ name: 'Default Project' })
@@ -54,21 +52,23 @@ export const useVaultStore = create<VaultState>((set, get) => ({
       set({ isLoading: false });
     }
   },
-  lock: () => set({ 
-    isUnlocked: false, 
-    masterKey: null, 
-    secrets: [], 
-    tokens: [], 
-    projects: [], 
-    activeProjectId: null 
+  lock: () => set({
+    isUnlocked: false,
+    masterKey: null,
+    secrets: [],
+    tokens: [],
+    projects: [],
+    activeProjectId: null
   }),
   setActiveProjectId: (id) => {
+    const current = get().activeProjectId;
+    if (current === id) return;
     set({ activeProjectId: id });
     get().fetchData();
   },
   fetchData: async () => {
     const activeId = get().activeProjectId;
-    if (!activeId) return;
+    if (!activeId || get().isLoading) return;
     set({ isLoading: true });
     try {
       const [secrets, tokens] = await Promise.all([
@@ -87,12 +87,11 @@ export const useVaultStore = create<VaultState>((set, get) => ({
       method: 'POST',
       body: JSON.stringify({ name })
     });
-    set(state => ({ 
-      projects: [...state.projects, newProject],
-      activeProjectId: state.activeProjectId ?? newProject.id
+    set(state => ({
+      projects: [...state.projects, newProject]
     }));
-    if (get().activeProjectId === newProject.id) {
-        await get().fetchData();
+    if (!get().activeProjectId) {
+      get().setActiveProjectId(newProject.id);
     }
   },
   removeProject: async (id: string) => {
@@ -104,9 +103,9 @@ export const useVaultStore = create<VaultState>((set, get) => ({
       nextActive = remaining.length > 0 ? remaining[0].id : null;
     }
     set({ projects: remaining, activeProjectId: nextActive });
-    if (nextActive) {
+    if (nextActive && nextActive !== currentActive) {
       await get().fetchData();
-    } else {
+    } else if (!nextActive) {
       set({ secrets: [], tokens: [] });
     }
   },
